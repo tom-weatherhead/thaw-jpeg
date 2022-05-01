@@ -1,0 +1,24 @@
+{
+	"root": true,
+	"parser": "@typescript-eslint/parser",
+	"plugins": [
+		"@typescript-eslint"
+	],
+	"extends": [
+		"eslint:recommended",
+		"plugin:@typescript-eslint/eslint-recommended",
+		"plugin:@typescript-eslint/recommended"
+	],
+	"globals": {
+		"console": true,
+		"module": true,
+		"require": true
+	},
+	"rules": {
+		"no-case-declarations": "warn",
+		"no-prototype-builtins": "warn",
+		"quotes": ["warn", "single", "avoid-escape"],
+		"@typescript-eslint/ban-types": "warn",
+		"@typescript-eslint/no-explicit-any": "warn"
+	}
+}
