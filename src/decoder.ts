@@ -29,20 +29,26 @@ import { BufferLike, IDecoderOptions, RawImageData, UintArrRet } from './types';
 type DataArray = Uint8Array;
 // type DataArray = Buffer;
 
-// type HuffmanNode = number | IHuffmanNode;
+// type HuffmanNode = number | IHuffmanNode; // | undefined;
+type HuffmanNode = IHuffmanNode; // | undefined;
 // interface IHuffmanNode {
 // 	// leftChild?: number | IHuffmanNode;
 // 	// rightChild?: number | IHuffmanNode;
 // 	leftChild?: HuffmanNode;
 // 	rightChild?: HuffmanNode;
 // }
-
-interface IHuffmanTree {
+interface IHuffmanNode {
+	children: (number | HuffmanNode)[];
 	index: number;
-	children: HuffmanTable;
 }
-type HuffmanTree = IHuffmanTree;
-type HuffmanTable = HuffmanTree[]; // or any
+
+// interface IHuffmanTree {
+// 	index: number;
+// 	children: HuffmanTable;
+// }
+// type HuffmanTree = IHuffmanTree;
+// type HuffmanTable = HuffmanTree[]; // or any
+type HuffmanTable = HuffmanNode;
 
 interface IComponent {
 	h: number;
@@ -149,6 +155,10 @@ const defaultOpts: IDecoderOptions = {
 	maxMemoryUsageInMB: 512 // Don't decode if memory footprint is more than 512MB
 };
 
+function createHuffmanNode(): HuffmanNode {
+	return { children: [], index: 0 };
+}
+
 class JpegImage {
 	public width = 0;
 	public height = 0;
@@ -161,16 +171,18 @@ class JpegImage {
 
 	// constructor() {}
 
-	public buildHuffmanTable(codeLengths: Uint8Array, values: Uint8Array): HuffmanTable {
+	// public buildHuffmanTable(codeLengths: Uint8Array, values: Uint8Array): HuffmanTable {
+	public buildHuffmanTable(codeLengths: Uint8Array, values: Uint8Array): HuffmanNode {
 		let k = 0,
 			length = 16;
-		const code: any[] = [];
+		const code: HuffmanNode[] = [];
 
 		while (length > 0 && !codeLengths[length - 1]) {
 			length--;
 		}
 
-		code.push({ children: [], index: 0 });
+		// code.push({ children: [], index: 0 });
+		code.push(createHuffmanNode());
 
 		let p = code[0];
 
@@ -215,10 +227,12 @@ class JpegImage {
 				code.push(p);
 
 				while (code.length <= i) {
-					const q = { children: [], index: 0 };
+					// const q = { children: [], index: 0 };
+					const q = createHuffmanNode();
 
 					code.push(q);
-					p.children[p.index] = q.children;
+					// p.children[p.index] = q.children;
+					p.children[p.index] = q;
 					p = q;
 				}
 
@@ -227,15 +241,18 @@ class JpegImage {
 
 			if (i + 1 < length) {
 				// p here points to the last code
-				const q = { children: [], index: 0 };
+				// const q = { children: [], index: 0 };
+				const q = createHuffmanNode();
 
 				code.push(q);
-				p.children[p.index] = q.children;
+				// p.children[p.index] = q.children;
+				p.children[p.index] = q;
 				p = q;
 			}
 		}
 
-		return code[0].children;
+		// return code[0].children;
+		return code[0];
 	}
 
 	public decodeScan(
@@ -302,19 +319,31 @@ class JpegImage {
 			return result;
 		}
 
-		function decodeHuffman(tree: HuffmanTable): number {
-			let node: any = tree,
+		// function decodeHuffman(tree: HuffmanTable): number {
+		function decodeHuffman(tree: HuffmanNode): number {
+			let node: HuffmanNode = tree,
 				bit: number | undefined;
 
 			while (typeof (bit = readBit()) !== 'undefined') {
-				node = node[bit];
+				// node = node[bit];
+				const child = node.children[bit];
 				// TODO: node = bit === 0 ? node.leftChild : node.rightChild;
 
-				if (typeof node === 'number') {
-					return node;
-				} else if (typeof node !== 'object') {
-					throw new Error('invalid huffman sequence');
+				if (typeof child === 'number') {
+					return child;
 				}
+
+				const childAsHuffmanNode = child as HuffmanNode;
+
+				if (
+					typeof childAsHuffmanNode === 'undefined' ||
+					typeof childAsHuffmanNode.children !== 'object' ||
+					typeof childAsHuffmanNode.index !== 'number'
+				) {
+					throw new Error('decodeHuffman() : Invalid Huffman sequence');
+				}
+
+				node = childAsHuffmanNode;
 			}
 
 			throw new Error('decodeHuffman() : End of bits');
@@ -1193,8 +1222,8 @@ class JpegImage {
 							blocks: [],
 							blocksPerLine: 0,
 							blocksPerColumn: 0,
-							huffmanTableAC: [],
-							huffmanTableDC: [],
+							huffmanTableAC: createHuffmanNode(),
+							huffmanTableDC: createHuffmanNode(),
 							lines: [],
 							scaleX: 0,
 							scaleY: 0
@@ -1367,8 +1396,8 @@ class JpegImage {
 				blocks: [],
 				blocksPerLine: 0,
 				blocksPerColumn: 0,
-				huffmanTableAC: [],
-				huffmanTableDC: []
+				huffmanTableAC: createHuffmanNode(),
+				huffmanTableDC: createHuffmanNode()
 			});
 		}
 	}
