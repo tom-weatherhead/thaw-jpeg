@@ -19,6 +19,7 @@
 		"noPropertyAccessFromIndexSignature": true,
 		"noUncheckedIndexedAccess": false,
 		"noUnusedLocals": true,
+		"noUnusedParameters": true,
 		"outDir": "./dist/lib",
 		"plugins": [
 			{

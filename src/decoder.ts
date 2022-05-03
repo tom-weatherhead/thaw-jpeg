@@ -29,25 +29,11 @@ import { BufferLike, IDecoderOptions, RawImageData, UintArrRet } from './types';
 type DataArray = Uint8Array;
 // type DataArray = Buffer;
 
-// type HuffmanNode = number | IHuffmanNode; // | undefined;
 type HuffmanNode = IHuffmanNode; // | undefined;
-// interface IHuffmanNode {
-// 	// leftChild?: number | IHuffmanNode;
-// 	// rightChild?: number | IHuffmanNode;
-// 	leftChild?: HuffmanNode;
-// 	rightChild?: HuffmanNode;
-// }
 interface IHuffmanNode {
 	children: (number | HuffmanNode)[];
 	index: number;
 }
-
-// interface IHuffmanTree {
-// 	index: number;
-// 	children: HuffmanTable;
-// }
-// type HuffmanTree = IHuffmanTree;
-// type HuffmanTable = HuffmanTree[]; // or any
 type HuffmanTable = HuffmanNode;
 
 interface IComponent {
@@ -181,7 +167,6 @@ class JpegImage {
 			length--;
 		}
 
-		// code.push({ children: [], index: 0 });
 		code.push(createHuffmanNode());
 
 		let p = code[0];
@@ -227,11 +212,9 @@ class JpegImage {
 				code.push(p);
 
 				while (code.length <= i) {
-					// const q = { children: [], index: 0 };
 					const q = createHuffmanNode();
 
 					code.push(q);
-					// p.children[p.index] = q.children;
 					p.children[p.index] = q;
 					p = q;
 				}
@@ -241,17 +224,14 @@ class JpegImage {
 
 			if (i + 1 < length) {
 				// p here points to the last code
-				// const q = { children: [], index: 0 };
 				const q = createHuffmanNode();
 
 				code.push(q);
-				// p.children[p.index] = q.children;
 				p.children[p.index] = q;
 				p = q;
 			}
 		}
 
-		// return code[0].children;
 		return code[0];
 	}
 
@@ -286,9 +266,6 @@ class JpegImage {
 
 			if (bitsCount > 0) {
 				bitsCount--;
-
-				// return (bitsData >> bitsCount) & 1;
-
 				result = (bitsData >> bitsCount) & 1;
 			} else {
 				bitsData = data[offset++];
@@ -306,9 +283,6 @@ class JpegImage {
 				}
 
 				bitsCount = 7;
-
-				// return bitsData >>> 7;
-
 				result = bitsData >>> 7;
 			}
 
@@ -325,9 +299,8 @@ class JpegImage {
 				bit: number | undefined;
 
 			while (typeof (bit = readBit()) !== 'undefined') {
-				// node = node[bit];
 				const child = node.children[bit];
-				// TODO: node = bit === 0 ? node.leftChild : node.rightChild;
+				// I.e. node = bit === 0 ? node.leftChild : node.rightChild;
 
 				if (typeof child === 'number') {
 					return child;
@@ -419,7 +392,9 @@ class JpegImage {
 			zz[0] = component.pred += diff;
 		}
 
+		// eslint-disable-next-line no-unused-vars
 		function decodeDCSuccessive(component: Component, zz: Int32Array): void {
+			component; // This suppresses the lint warning about the parameter 'component' never being used.
 			zz[0] |= readBit() << successive;
 		}
 
@@ -693,6 +668,8 @@ class JpegImage {
 		// Only 1 used per invocation of this function and garbage collected after invocation, so no need to account for its memory footprint.
 		const R = new Int32Array(64),
 			r = new Uint8Array(64);
+
+		frame; // This suppresses the lint warning about the parameter 'frame' never being used.
 
 		// A port of poppler's IDCT method which in turn is taken from:
 		//   Christoph Loeffler, Adriaan Ligtenberg, George S. Moschytz,
