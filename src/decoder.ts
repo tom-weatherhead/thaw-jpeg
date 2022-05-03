@@ -36,7 +36,7 @@ interface IHuffmanTree {
 	children: HuffmanTable;
 }
 type HuffmanTree = IHuffmanTree;
-type HuffmanTable = HuffmanTree[];
+type HuffmanTable = HuffmanTree[]; // or any
 
 interface IComponent {
 	h: number;
@@ -284,13 +284,12 @@ class JpegImage {
 			return result;
 		}
 
-		function decodeHuffman(tree: HuffmanTable): number /* | undefined */ {
+		function decodeHuffman(tree: HuffmanTable): number {
 			let node: any = tree,
 				bit: number | undefined;
 
 			while (typeof (bit = readBit()) !== 'undefined') {
 				node = node[bit];
-				// type HuffmanTree = number | HuffmanTree[];
 
 				if (typeof node === 'number') {
 					return node;
@@ -299,18 +298,16 @@ class JpegImage {
 				}
 			}
 
-			// return undefined;
 			throw new Error('decodeHuffman() : End of bits');
 		}
 
-		function receive(length: number): number /* | undefined */ {
+		function receive(length: number): number {
 			let n = 0;
 
 			while (length > 0) {
 				const bit = readBit();
 
 				if (typeof bit === 'undefined') {
-					// return undefined;
 					throw new Error('receive() : bitt is undefined');
 				}
 
@@ -338,19 +335,30 @@ class JpegImage {
 		function decodeBaseline(component: Component, zz: Int32Array): void {
 			const t = decodeHuffman(component.huffmanTableDC);
 			const diff = t === 0 ? 0 : receiveAndExtend(t);
+
 			zz[0] = component.pred += diff;
+
 			let k = 1;
+
 			while (k < 64) {
 				const rs = decodeHuffman(component.huffmanTableAC);
 				const s = rs & 15,
 					r = rs >> 4;
+
 				if (s === 0) {
-					if (r < 15) break;
+					if (r < 15) {
+						break;
+					}
+
 					k += 16;
+
 					continue;
 				}
+
 				k += r;
+
 				const z = dctZigZag[k];
+
 				zz[z] = receiveAndExtend(s);
 				k++;
 			}
@@ -359,6 +367,7 @@ class JpegImage {
 		function decodeDCFirst(component: Component, zz: Int32Array): void {
 			const t = decodeHuffman(component.huffmanTableDC);
 			const diff = t === 0 ? 0 : receiveAndExtend(t) << successive;
+
 			zz[0] = component.pred += diff;
 		}
 
@@ -371,24 +380,34 @@ class JpegImage {
 		function decodeACFirst(component: Component, zz: Int32Array): void {
 			if (eobrun > 0) {
 				eobrun--;
+
 				return;
 			}
+
 			let k = spectralStart;
 			const e = spectralEnd;
+
 			while (k <= e) {
 				const rs = decodeHuffman(component.huffmanTableAC);
 				const s = rs & 15,
 					r = rs >> 4;
+
 				if (s === 0) {
 					if (r < 15) {
 						eobrun = receive(r) + (1 << r) - 1;
+
 						break;
 					}
+
 					k += 16;
+
 					continue;
 				}
+
 				k += r;
+
 				const z = dctZigZag[k];
+
 				zz[z] = receiveAndExtend(s) * (1 << successive);
 				k++;
 			}
@@ -413,7 +432,7 @@ class JpegImage {
 						rs = decodeHuffman(component.huffmanTableAC);
 						s = rs & 15;
 
-						/* let */ r = rs >> 4;
+						r = rs >> 4;
 
 						if (s === 0) {
 							if (r < 15) {
@@ -505,8 +524,13 @@ class JpegImage {
 		): void {
 			const blockRow = (mcu / component.blocksPerLine) | 0;
 			const blockCol = mcu % component.blocksPerLine;
+
 			// If the block is missing and we're in tolerant mode, just skip it.
-			if (component.blocks[blockRow] === undefined && opts.tolerantDecoding) return;
+
+			if (typeof component.blocks[blockRow] === 'undefined' && opts.tolerantDecoding) {
+				return;
+			}
+
 			decode(component, component.blocks[blockRow][blockCol]);
 		}
 
@@ -539,8 +563,10 @@ class JpegImage {
 		}
 
 		let h, v;
+
 		while (mcu < mcuExpected) {
 			// reset interval stuff
+
 			for (i = 0; i < componentsLength; i++) {
 				components[i].pred = 0;
 			}
@@ -549,6 +575,7 @@ class JpegImage {
 
 			if (componentsLength == 1) {
 				component = components[0];
+
 				for (n = 0; n < resetInterval; n++) {
 					decodeBlock(component, decodeFn, mcu);
 					mcu++;
@@ -559,27 +586,34 @@ class JpegImage {
 						component = components[i];
 						h = component.h;
 						v = component.v;
+
 						for (j = 0; j < v; j++) {
 							for (k = 0; k < h; k++) {
 								decodeMcu(component, decodeFn, mcu, j, k);
 							}
 						}
 					}
+
 					mcu++;
 
-					// If we've reached our expected MCU's, stop decoding
-					if (mcu === mcuExpected) break;
+					// If we've reached our expected MCUs, stop decoding
+
+					if (mcu === mcuExpected) {
+						break;
+					}
 				}
 			}
 
 			if (mcu === mcuExpected) {
 				// Skip trailing bytes at the end of the scan - until we reach the next marker
+
 				do {
 					if (data[offset] === 0xff) {
 						if (data[offset + 1] !== 0x00) {
 							break;
 						}
 					}
+
 					offset += 1;
 				} while (offset < data.length - 2);
 			}
@@ -587,6 +621,7 @@ class JpegImage {
 			// find marker
 			bitsCount = 0;
 			marker = (data[offset] << 8) | data[offset + 1];
+
 			if (marker < 0xff00) {
 				throw new Error('marker was not found');
 			}
@@ -594,7 +629,9 @@ class JpegImage {
 			if (marker >= 0xffd0 && marker <= 0xffd7) {
 				// RSTx
 				offset += 2;
-			} else break;
+			} else {
+				break;
+			}
 		}
 
 		return offset - startOffset;
@@ -625,11 +662,13 @@ class JpegImage {
 			let i;
 
 			// dequant
+
 			for (i = 0; i < 64; i++) {
 				p[i] = zz[i] * qt[i];
 			}
 
 			// inverse DCT on rows
+
 			for (i = 0; i < 8; ++i) {
 				const row = 8 * i;
 
@@ -782,13 +821,12 @@ class JpegImage {
 			// convert to 8-bit integers
 			for (i = 0; i < 64; ++i) {
 				const sample = 128 + ((p[i] + 8) >> 4);
+
 				dataOut[i] = sample < 0 ? 0 : sample > 0xff ? 0xff : sample;
 			}
 		}
 
 		JpegImage.requestMemoryAllocation(samplesPerLine * blocksPerColumn * 8);
-
-		// let i, j;
 
 		for (let blockRow = 0; blockRow < blocksPerColumn; blockRow++) {
 			const scanLine = blockRow << 3;
@@ -841,8 +879,7 @@ class JpegImage {
 		}
 
 		const maxResolutionInPixels = this.opts.maxResolutionInMP * 1000 * 1000;
-		let offset = 0; /*,
-			length = data.length */
+		let offset = 0;
 
 		function readUint16(): number {
 			const value = (data[offset] << 8) | data[offset + 1];
@@ -927,7 +964,6 @@ class JpegImage {
 
 		let jfif = defaultJFIFValue;
 		let adobe = defaultAdobeValue;
-		// let pixels = null;
 		let frame = defaultIFrame,
 			resetInterval = 0;
 		const quantizationTables = [],
@@ -951,7 +987,7 @@ class JpegImage {
 
 		while (fileMarker != 0xffd9) {
 			// EOI (End of image)
-			let i: number; //, j: number; // , l;
+			let i: number;
 			let pixelsInFrame: number;
 			let componentsCount: number;
 			let huffmanLength: number;
@@ -1080,6 +1116,7 @@ class JpegImage {
 
 						quantizationTables[quantizationTableSpec & 15] = tableData;
 					}
+
 					break;
 
 				case 0xffc0: // SOF0 (Start of Frame, Baseline DCT)
@@ -1157,19 +1194,26 @@ class JpegImage {
 						const huffmanTableSpec = data[offset++];
 						const codeLengths = new Uint8Array(16);
 						let codeLengthSum = 0;
+
 						for (let j = 0; j < 16; j++, offset++) {
 							codeLengthSum += codeLengths[j] = data[offset];
 						}
+
 						JpegImage.requestMemoryAllocation(16 + codeLengthSum);
+
 						const huffmanValues = new Uint8Array(codeLengthSum);
-						for (let j = 0; j < codeLengthSum; j++, offset++)
+
+						for (let j = 0; j < codeLengthSum; j++, offset++) {
 							huffmanValues[j] = data[offset];
+						}
+
 						i += 17 + codeLengthSum;
 
 						(huffmanTableSpec >> 4 === 0 ? huffmanTablesDC : huffmanTablesAC)[
 							huffmanTableSpec & 15
 						] = this.buildHuffmanTable(codeLengths, huffmanValues);
 					}
+
 					break;
 
 				case 0xffdd: // DRI (Define Restart Interval)
@@ -1191,6 +1235,7 @@ class JpegImage {
 					for (i = 0; i < selectorsCount; i++) {
 						const component = frame.components[data[offset++]];
 						const tableSpec = data[offset++];
+
 						component.huffmanTableDC = huffmanTablesDC[tableSpec >> 4];
 						component.huffmanTableAC = huffmanTablesAC[tableSpec & 15];
 						components.push(component);
@@ -1326,22 +1371,28 @@ class JpegImage {
 		switch (this.components.length) {
 			case 1:
 				component1 = this.components[0];
+
 				for (y = 0; y < height; y++) {
 					component1Line = component1.lines[0 | (y * component1.scaleY * scaleY)];
+
 					for (x = 0; x < width; x++) {
 						Y = component1Line[0 | (x * component1.scaleX * scaleX)];
 
 						data[offset++] = Y;
 					}
 				}
+
 				break;
+
 			case 2:
 				// PDF might compress two component data in custom colorspace
 				component1 = this.components[0];
 				component2 = this.components[1];
+
 				for (y = 0; y < height; y++) {
 					component1Line = component1.lines[0 | (y * component1.scaleY * scaleY)];
 					component2Line = component2.lines[0 | (y * component2.scaleY * scaleY)];
+
 					for (x = 0; x < width; x++) {
 						Y = component1Line[0 | (x * component1.scaleX * scaleX)];
 						data[offset++] = Y;
@@ -1349,22 +1400,30 @@ class JpegImage {
 						data[offset++] = Y;
 					}
 				}
+
 				break;
+
 			case 3:
 				// The default transform for three components is true
 				colorTransform = true;
-				// The adobe transform marker overrides any previous setting
-				if (this.adobe && this.adobe.transformCode) colorTransform = true;
-				else if (typeof this.opts.colorTransform !== 'undefined')
+
+				// The Adobe transform marker overrides any previous setting
+
+				if (this.adobe && this.adobe.transformCode) {
+					colorTransform = true;
+				} else if (typeof this.opts.colorTransform !== 'undefined') {
 					colorTransform = !!this.opts.colorTransform;
+				}
 
 				component1 = this.components[0];
 				component2 = this.components[1];
 				component3 = this.components[2];
+
 				for (y = 0; y < height; y++) {
 					component1Line = component1.lines[0 | (y * component1.scaleY * scaleY)];
 					component2Line = component2.lines[0 | (y * component2.scaleY * scaleY)];
 					component3Line = component3.lines[0 | (y * component3.scaleY * scaleY)];
+
 					for (x = 0; x < width; x++) {
 						if (!colorTransform) {
 							R = component1Line[0 | (x * component1.scaleX * scaleX)];
@@ -1387,25 +1446,36 @@ class JpegImage {
 						data[offset++] = B;
 					}
 				}
+
 				break;
+
 			case 4:
-				if (!this.adobe) throw new Error('Unsupported color mode (4 components)');
+				if (!this.adobe) {
+					throw new Error('Unsupported color mode (4 components)');
+				}
+
 				// The default transform for four components is false
 				colorTransform = false;
+
 				// The adobe transform marker overrides any previous setting
-				if (this.adobe && this.adobe.transformCode) colorTransform = true;
-				else if (typeof this.opts.colorTransform !== 'undefined')
+
+				if (this.adobe && this.adobe.transformCode) {
+					colorTransform = true;
+				} else if (typeof this.opts.colorTransform !== 'undefined') {
 					colorTransform = !!this.opts.colorTransform;
+				}
 
 				component1 = this.components[0];
 				component2 = this.components[1];
 				component3 = this.components[2];
 				component4 = this.components[3];
+
 				for (y = 0; y < height; y++) {
 					component1Line = component1.lines[0 | (y * component1.scaleY * scaleY)];
 					component2Line = component2.lines[0 | (y * component2.scaleY * scaleY)];
 					component3Line = component3.lines[0 | (y * component3.scaleY * scaleY)];
 					component4Line = component4.lines[0 | (y * component4.scaleY * scaleY)];
+
 					for (x = 0; x < width; x++) {
 						if (!colorTransform) {
 							C = component1Line[0 | (x * component1.scaleX * scaleX)];
@@ -1426,12 +1496,14 @@ class JpegImage {
 								);
 							Ye = 255 - this.clampTo8bit(Y + 1.772 * (Cb - 128));
 						}
+
 						data[offset++] = 255 - C;
 						data[offset++] = 255 - M;
 						data[offset++] = 255 - Ye;
 						data[offset++] = 255 - K;
 					}
 				}
+
 				break;
 
 			default:
@@ -1454,6 +1526,7 @@ class JpegImage {
 			x,
 			y;
 		let Y, K, C, M, R, G, B;
+
 		switch (this.components.length) {
 			case 1:
 				for (y = 0; y < height; y++) {
@@ -1463,12 +1536,15 @@ class JpegImage {
 						imageDataArray[j++] = Y;
 						imageDataArray[j++] = Y;
 						imageDataArray[j++] = Y;
+
 						if (formatAsRGBA) {
 							imageDataArray[j++] = 255;
 						}
 					}
 				}
+
 				break;
+
 			case 3:
 				for (y = 0; y < height; y++) {
 					for (x = 0; x < width; x++) {
@@ -1479,12 +1555,15 @@ class JpegImage {
 						imageDataArray[j++] = R;
 						imageDataArray[j++] = G;
 						imageDataArray[j++] = B;
+
 						if (formatAsRGBA) {
 							imageDataArray[j++] = 255;
 						}
 					}
 				}
+
 				break;
+
 			case 4:
 				for (y = 0; y < height; y++) {
 					for (x = 0; x < width; x++) {
@@ -1500,12 +1579,15 @@ class JpegImage {
 						imageDataArray[j++] = R;
 						imageDataArray[j++] = G;
 						imageDataArray[j++] = B;
+
 						if (formatAsRGBA) {
 							imageDataArray[j++] = 255;
 						}
 					}
 				}
+
 				break;
+
 			default:
 				throw new Error('Unsupported color mode');
 		}
@@ -1546,7 +1628,6 @@ class JpegImage {
 
 	// return constructor;
 }
-// )();
 
 // if (typeof module !== 'undefined') {
 // 	module.exports = decode;
@@ -1555,7 +1636,6 @@ class JpegImage {
 // 	window['jpeg-js'].decode = decode;
 // }
 
-// decode(jpegData, userOpts = {})
 export function decode(
 	jpegData: BufferLike,
 	userOpts: IDecoderOptions = {}
@@ -1563,9 +1643,11 @@ export function decode(
 	const opts = { ...defaultOpts, ...userOpts };
 	const arr = new Uint8Array(jpegData);
 	const decoder = new JpegImage();
+
 	decoder.opts = opts;
 	// If this constructor ever supports async decoding this will need to be done differently.
-	// Until then, treating as singleton limit is fine.
+	// Until then, treating the memory manager as singleton is fine.
+
 	if (typeof opts.maxMemoryUsageInMB !== 'undefined') {
 		JpegImage.resetMaxMemoryUsage(opts.maxMemoryUsageInMB * 1024 * 1024);
 	}
@@ -1585,6 +1667,7 @@ export function decode(
 			data: opts.useTArray ? new Uint8Array(bytesNeeded) : Buffer.alloc(bytesNeeded),
 			comments: undefined
 		};
+
 		if (decoder.comments.length > 0) {
 			image.comments = decoder.comments;
 		}
@@ -1603,6 +1686,7 @@ export function decode(
 				);
 			}
 		}
+
 		throw err;
 	}
 
