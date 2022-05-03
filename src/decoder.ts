@@ -29,7 +29,13 @@ import { BufferLike, IDecoderOptions, RawImageData, UintArrRet } from './types';
 type DataArray = Uint8Array;
 // type DataArray = Buffer;
 
-// type Codee = number | Codee[];
+// type HuffmanNode = number | IHuffmanNode;
+// interface IHuffmanNode {
+// 	// leftChild?: number | IHuffmanNode;
+// 	// rightChild?: number | IHuffmanNode;
+// 	leftChild?: HuffmanNode;
+// 	rightChild?: HuffmanNode;
+// }
 
 interface IHuffmanTree {
 	index: number;
@@ -176,6 +182,12 @@ class JpegImage {
 					throw new Error('buildHuffmanTable() : code stack underflow (1)');
 				}
 
+				if (pp.index !== 0 && pp.index !== 1) {
+					throw new Error(
+						'buildHuffmanTable() : ThAW Ack! pp.index is neither 0 nor 1 (1)'
+					);
+				}
+
 				p = pp;
 				p.children[p.index] = values[k];
 
@@ -188,6 +200,12 @@ class JpegImage {
 
 					if (typeof ppp === 'undefined') {
 						throw new Error('buildHuffmanTable() : code stack underflow (2)');
+					}
+
+					if (ppp.index !== 0 && ppp.index !== 1) {
+						throw new Error(
+							'buildHuffmanTable() : ThAW Ack! ppp.index is neither 0 nor 1 (2)'
+						);
 					}
 
 					p = ppp;
@@ -290,6 +308,7 @@ class JpegImage {
 
 			while (typeof (bit = readBit()) !== 'undefined') {
 				node = node[bit];
+				// TODO: node = bit === 0 ? node.leftChild : node.rightChild;
 
 				if (typeof node === 'number') {
 					return node;
