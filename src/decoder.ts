@@ -29,7 +29,7 @@ import { BufferLike, IDecoderOptions, RawImageData, UintArrRet } from './types';
 type DataArray = Uint8Array;
 // type DataArray = Buffer;
 
-type HuffmanNode = IHuffmanNode; // | undefined;
+type HuffmanNode = IHuffmanNode;
 interface IHuffmanNode {
 	children: (number | HuffmanNode)[];
 	index: number;
@@ -157,8 +157,7 @@ class JpegImage {
 
 	// constructor() {}
 
-	// public buildHuffmanTable(codeLengths: Uint8Array, values: Uint8Array): HuffmanTable {
-	public buildHuffmanTable(codeLengths: Uint8Array, values: Uint8Array): HuffmanNode {
+	public buildHuffmanTable(codeLengths: Uint8Array, values: Uint8Array): HuffmanTable {
 		let k = 0,
 			length = 16;
 		const code: HuffmanNode[] = [];
@@ -186,7 +185,7 @@ class JpegImage {
 				}
 
 				p = pp;
-				p.children[p.index] = values[k];
+				p.children[p.index] = values[k++];
 
 				while (p.index > 0) {
 					if (code.length === 0) {
@@ -219,7 +218,7 @@ class JpegImage {
 					p = q;
 				}
 
-				k++;
+				// k++;
 			}
 
 			if (i + 1 < length) {
@@ -392,7 +391,6 @@ class JpegImage {
 			zz[0] = component.pred += diff;
 		}
 
-		// eslint-disable-next-line no-unused-vars
 		function decodeDCSuccessive(component: Component, zz: Int32Array): void {
 			component; // This suppresses the lint warning about the parameter 'component' never being used.
 			zz[0] |= readBit() << successive;
