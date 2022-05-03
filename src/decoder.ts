@@ -30,15 +30,25 @@ import { BufferLike, IDecoderOptions, RawImageData, UintArrRet } from './types';
 type DataArray = Uint8Array;
 // type DataArray = Buffer;
 
-type Component = any;
-// interface IComponent {
-// 	h: h,
-// 	v: v,
-// 	quantizationIdx: qId
-// }
-// type Component = IComponent;
-
 type HuffmanTree = any;
+
+// type Component = any;
+interface IComponent {
+	h: number;
+	v: number;
+	pred: number;
+	quantizationTable: Int32Array;
+	quantizationIdx?: number;
+	blocks: Int32Array[][];
+	blocksPerLine: number;
+	blocksPerColumn: number;
+	huffmanTableAC: HuffmanTree;
+	huffmanTableDC: HuffmanTree;
+	lines: Uint8Array[];
+	scaleX: number;
+	scaleY: number;
+}
+type Component = IComponent;
 
 interface IFrame {
 	precision: number;
@@ -51,8 +61,8 @@ interface IFrame {
 	maxH: number;
 	maxV: number;
 
-	components: any;
-	// components: Component[];
+	// components: any;
+	components: Component[];
 	// componentsOrder = [];
 	componentsOrder: number[];
 }
@@ -68,8 +78,8 @@ const defaultIFrame: IFrame = {
 	maxH: 0,
 	maxV: 0,
 
-	components: {},
-	// components: [],
+	// components: {},
+	components: [],
 	componentsOrder: []
 };
 
@@ -412,8 +422,13 @@ class JpegImage {
 			const mcuCol = mcu % mcusPerLine;
 			const blockRow = mcuRow * component.v + row;
 			const blockCol = mcuCol * component.h + col;
+
 			// If the block is missing and we're in tolerant mode, just skip it.
-			if (component.blocks[blockRow] === undefined && opts.tolerantDecoding) return;
+
+			if (typeof component.blocks[blockRow] === 'undefined' && opts.tolerantDecoding) {
+				return;
+			}
+
 			decode(component, component.blocks[blockRow][blockCol]);
 		}
 
@@ -431,11 +446,14 @@ class JpegImage {
 
 		const componentsLength = components.length;
 		let component, i, j, k, n;
-		let decodeFn;
+		let decodeFn: (component: Component, zz: number[]) => void;
+
 		if (progressive) {
-			if (spectralStart === 0)
+			if (spectralStart === 0) {
 				decodeFn = successivePrev === 0 ? decodeDCFirst : decodeDCSuccessive;
-			else decodeFn = successivePrev === 0 ? decodeACFirst : decodeACSuccessive;
+			} else {
+				decodeFn = successivePrev === 0 ? decodeACFirst : decodeACSuccessive;
+			}
 		} else {
 			decodeFn = decodeBaseline;
 		}
@@ -457,7 +475,10 @@ class JpegImage {
 		let h, v;
 		while (mcu < mcuExpected) {
 			// reset interval stuff
-			for (i = 0; i < componentsLength; i++) components[i].pred = 0;
+			for (i = 0; i < componentsLength; i++) {
+				components[i].pred = 0;
+			}
+
 			eobrun = 0;
 
 			if (componentsLength == 1) {
@@ -528,7 +549,7 @@ class JpegImage {
 		//   IEEE Intl. Conf. on Acoustics, Speech & Signal Processing, 1989,
 		//   988-991.
 		function quantizeAndInverse(
-			zz: number[],
+			zz: Int32Array,
 			dataOut: Uint8Array,
 			dataIn: Int32Array
 		): void {
@@ -725,6 +746,7 @@ class JpegImage {
 				}
 			}
 		}
+
 		return lines;
 	}
 
@@ -1006,7 +1028,8 @@ class JpegImage {
 						scanLines: readUint16(),
 						samplesPerLine: readUint16(),
 						// END
-						components: {},
+						// components: {},
+						components: [],
 						componentsOrder: [],
 						mcusPerLine: 0,
 						mcusPerColumn: 0,
@@ -1042,7 +1065,17 @@ class JpegImage {
 						frame.components[componentId] = {
 							h: h,
 							v: v,
-							quantizationIdx: qId
+							quantizationIdx: qId,
+							pred: 0,
+							quantizationTable: new Int32Array(),
+							blocks: [],
+							blocksPerLine: 0,
+							blocksPerColumn: 0,
+							huffmanTableAC: undefined,
+							huffmanTableDC: undefined,
+							lines: [],
+							scaleX: 0,
+							scaleY: 0
 						};
 						offset += 3;
 					}
@@ -1173,7 +1206,12 @@ class JpegImage {
 			const cp = frames[i].components;
 
 			for (const j in cp) {
-				cp[j].quantizationTable = quantizationTables[cp[j].quantizationIdx];
+				const k = cp[j].quantizationIdx;
+
+				if (typeof k !== 'undefined') {
+					cp[j].quantizationTable = quantizationTables[k];
+				}
+
 				delete cp[j].quantizationIdx;
 			}
 		}
@@ -1190,7 +1228,17 @@ class JpegImage {
 			this.components.push({
 				lines: this.buildComponentData(frame, component),
 				scaleX: component.h / frame.maxH,
-				scaleY: component.v / frame.maxV
+				scaleY: component.v / frame.maxV,
+				h: 0,
+				v: 0,
+				pred: 0,
+				quantizationTable: new Int32Array(),
+				quantizationIdx: 0,
+				blocks: [],
+				blocksPerLine: 0,
+				blocksPerColumn: 0,
+				huffmanTableAC: undefined,
+				huffmanTableDC: undefined
 			});
 		}
 	}
