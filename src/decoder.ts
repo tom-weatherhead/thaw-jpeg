@@ -217,8 +217,6 @@ class JpegImage {
 					p.children[p.index] = q;
 					p = q;
 				}
-
-				// k++;
 			}
 
 			if (i + 1 < length) {
@@ -292,8 +290,7 @@ class JpegImage {
 			return result;
 		}
 
-		// function decodeHuffman(tree: HuffmanTable): number {
-		function decodeHuffman(tree: HuffmanNode): number {
+		function decodeHuffman(tree: HuffmanTable): number {
 			let node: HuffmanNode = tree,
 				bit: number | undefined;
 
@@ -324,15 +321,20 @@ class JpegImage {
 		function receive(length: number): number {
 			let n = 0;
 
-			while (length > 0) {
-				const bit = readBit();
+			// while (length > 0) {
+			// 	const bit = readBit();
+			//
+			// 	// if (typeof bit === 'undefined') {
+			// 	// 	throw new Error('receive() : bit from readBit() is undefined');
+			// 	// }
+			//
+			// 	n = (n << 1) | bit;
+			// 	length--;
+			// }
 
-				if (typeof bit === 'undefined') {
-					throw new Error('receive() : bitt is undefined');
-				}
-
-				n = (n << 1) | bit;
-				length--;
+			for (; length > 0; length--) {
+				n <<= 1;
+				n |= readBit();
 			}
 
 			return n;
