@@ -329,11 +329,13 @@ class JpegImage {
 			while (k <= e) {
 				const z = dctZigZag[k];
 				const direction = zz[z] < 0 ? -1 : 1;
+				let rs = 0,
+					s = 0;
 
 				switch (successiveACState) {
 					case 0: // initial state
-						const rs = decodeHuffman(component.huffmanTableAC);
-						const s = rs & 15;
+						rs = decodeHuffman(component.huffmanTableAC);
+						s = rs & 15;
 
 						/* let */ r = rs >> 4;
 
@@ -777,10 +779,17 @@ class JpegImage {
 			let component, componentId;
 
 			for (componentId in frame.components) {
-				if (frame.components.hasOwnProperty(componentId)) {
+				// if (frame.components.hasOwnProperty(componentId)) {
+				if (Object.prototype.hasOwnProperty.call(frame.components, componentId)) {
 					component = frame.components[componentId];
-					if (maxH < component.h) maxH = component.h;
-					if (maxV < component.v) maxV = component.v;
+
+					if (maxH < component.h) {
+						maxH = component.h;
+					}
+
+					if (maxV < component.v) {
+						maxV = component.v;
+					}
 				}
 			}
 
@@ -788,7 +797,8 @@ class JpegImage {
 			const mcusPerColumn = Math.ceil(frame.scanLines / 8 / maxV);
 
 			for (componentId in frame.components) {
-				if (frame.components.hasOwnProperty(componentId)) {
+				// if (frame.components.hasOwnProperty(componentId)) {
+				if (Object.prototype.hasOwnProperty.call(frame.components, componentId)) {
 					component = frame.components[componentId];
 
 					const blocksPerLine = Math.ceil(
@@ -838,6 +848,9 @@ class JpegImage {
 			huffmanTablesDC: any[] = [];
 		let fileMarker = readUint16();
 		let malformedDataOffset = -1;
+		let appData: Uint8Array;
+		let quantizationTablesLength: number;
+		let quantizationTablesEnd: number;
 
 		this.comments = [];
 
@@ -847,12 +860,24 @@ class JpegImage {
 		}
 
 		fileMarker = readUint16();
+
 		while (fileMarker != 0xffd9) {
 			// EOI (End of image)
 			let i: number; //, j: number; // , l;
+			let pixelsInFrame: number;
+			let componentsCount: number;
+			let huffmanLength: number;
+			let selectorsCount: number;
+			let components: Component[];
+			let spectralStart: number;
+			let spectralEnd: number;
+			let successiveApproximation: number;
+			let processed: number;
+
 			switch (fileMarker) {
 				case 0xff00:
 					break;
+
 				case 0xffe0: // APP0 (Application Specific)
 				case 0xffe1: // APP1
 				case 0xffe2: // APP2
@@ -870,7 +895,7 @@ class JpegImage {
 				case 0xffee: // APP14
 				case 0xffef: // APP15
 				case 0xfffe: // COM (Comment)
-					const appData = readDataBlock();
+					appData = readDataBlock();
 
 					if (fileMarker === 0xfffe) {
 						const comment = String.fromCharCode.apply(null, Array.from(appData));
@@ -901,6 +926,7 @@ class JpegImage {
 							};
 						}
 					}
+
 					// TODO APP1 - Exif
 					if (fileMarker === 0xffe1) {
 						if (
@@ -936,8 +962,8 @@ class JpegImage {
 					break;
 
 				case 0xffdb: // DQT (Define Quantization Tables)
-					const quantizationTablesLength = readUint16();
-					const quantizationTablesEnd = quantizationTablesLength + offset - 2;
+					quantizationTablesLength = readUint16();
+					quantizationTablesEnd = quantizationTablesLength + offset - 2;
 
 					while (offset < quantizationTablesEnd) {
 						const quantizationTableSpec = data[offset++];
@@ -988,7 +1014,7 @@ class JpegImage {
 						maxV: 0
 					};
 
-					const pixelsInFrame = frame.scanLines * frame.samplesPerLine;
+					pixelsInFrame = frame.scanLines * frame.samplesPerLine;
 
 					if (pixelsInFrame > maxResolutionInPixels) {
 						const exceededAmount = Math.ceil(
@@ -1000,7 +1026,8 @@ class JpegImage {
 						);
 					}
 
-					const componentsCount = data[offset++];
+					componentsCount = data[offset++];
+
 					// let componentId;
 					// let maxH = 0,
 					// 	maxV = 0;
@@ -1025,7 +1052,8 @@ class JpegImage {
 					break;
 
 				case 0xffc4: // DHT (Define Huffman Tables)
-					const huffmanLength = readUint16();
+					huffmanLength = readUint16();
+
 					for (i = 2; i < huffmanLength; ) {
 						const huffmanTableSpec = data[offset++];
 						const codeLengths = new Uint8Array(16);
@@ -1057,9 +1085,10 @@ class JpegImage {
 
 				case 0xffda: // SOS (Start of Scan)
 					/* let scanLength = */ readUint16();
-					const selectorsCount = data[offset++];
-					const components = [];
+					selectorsCount = data[offset++];
+					components = [];
 					// let component;
+
 					for (i = 0; i < selectorsCount; i++) {
 						const component = frame.components[data[offset++]];
 						const tableSpec = data[offset++];
@@ -1067,10 +1096,11 @@ class JpegImage {
 						component.huffmanTableAC = huffmanTablesAC[tableSpec & 15];
 						components.push(component);
 					}
-					const spectralStart = data[offset++];
-					const spectralEnd = data[offset++];
-					const successiveApproximation = data[offset++];
-					const processed = this.decodeScan(
+
+					spectralStart = data[offset++];
+					spectralEnd = data[offset++];
+					successiveApproximation = data[offset++];
+					processed = this.decodeScan(
 						data,
 						offset,
 						frame,
@@ -1090,7 +1120,9 @@ class JpegImage {
 						// Avoid skipping a valid marker.
 						offset--;
 					}
+
 					break;
+
 				default:
 					if (
 						data[offset - 3] == 0xff &&
@@ -1104,6 +1136,7 @@ class JpegImage {
 					} else if (fileMarker === 0xe0 || fileMarker == 0xe1) {
 						// Recover from malformed APP1 markers popular in some phone models.
 						// See https://github.com/eugeneware/jpeg-js/issues/82
+
 						if (malformedDataOffset !== -1) {
 							throw new Error(
 								`first unknown JPEG marker at offset ${malformedDataOffset.toString(
@@ -1113,15 +1146,20 @@ class JpegImage {
 								)} at offset ${(offset - 1).toString(16)}`
 							);
 						}
+
 						malformedDataOffset = offset - 1;
+
 						const nextOffset = readUint16();
+
 						if (data[offset + nextOffset - 2] === 0xff) {
 							offset += nextOffset - 2;
 							break;
 						}
 					}
+
 					throw new Error('unknown JPEG marker ' + fileMarker.toString(16));
 			}
+
 			fileMarker = readUint16();
 		}
 
@@ -1130,6 +1168,7 @@ class JpegImage {
 		}
 
 		// set each frame's components quantization table
+
 		for (let i = 0; i < frames.length; i++) {
 			const cp = frames[i].components;
 
