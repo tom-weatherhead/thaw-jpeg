@@ -26,22 +26,18 @@
 
 import { BufferLike, IDecoderOptions, RawImageData, UintArrRet } from './types';
 
-// type DataArray = number[];
 type DataArray = Uint8Array;
 // type DataArray = Buffer;
 
-// type HuffmanTree = any;
-// type HuffmanTreeA = number | HuffmanTreeA[];
+// type Codee = number | Codee[];
+
 interface IHuffmanTree {
 	index: number;
-	// children: IHuffmanTree[];
-	// children: Array<number | IHuffmanTree>;
 	children: HuffmanTable;
 }
 type HuffmanTree = IHuffmanTree;
 type HuffmanTable = HuffmanTree[];
 
-// type Component = any;
 interface IComponent {
 	h: number;
 	v: number;
@@ -70,9 +66,7 @@ interface IFrame {
 	maxH: number;
 	maxV: number;
 
-	// components: any;
 	components: Component[];
-	// componentsOrder = [];
 	componentsOrder: number[];
 }
 
@@ -86,8 +80,6 @@ const defaultIFrame: IFrame = {
 	progressive: false,
 	maxH: 0,
 	maxV: 0,
-
-	// components: {},
 	components: [],
 	componentsOrder: []
 };
@@ -108,7 +100,7 @@ const defaultJFIFValue: IJFIF = {
 	xDensity: 0,
 	yDensity: 0,
 	thumbWidth: 0,
-	thumbHeight: 0, // appData[13], appData is a Uint8Array
+	thumbHeight: 0,
 	thumbData: new Uint8Array()
 };
 
@@ -151,14 +143,11 @@ const defaultOpts: IDecoderOptions = {
 	maxMemoryUsageInMB: 512 // Don't decode if memory footprint is more than 512MB
 };
 
-// let JpegImage = (function jpegImage() {
-// 	'use strict';
 class JpegImage {
 	public width = 0;
 	public height = 0;
 	public comments: string[] = [];
 	public exifBuffer: Uint8Array | undefined;
-	// public exifBuffer: number[] | undefined;
 	public opts = defaultOpts;
 	public jfif = defaultJFIFValue;
 	public adobe = defaultAdobeValue;
@@ -166,12 +155,9 @@ class JpegImage {
 
 	// constructor() {}
 
-	// public buildHuffmanTable(codeLengths: Uint8Array, values: Uint8Array): any[] {
 	public buildHuffmanTable(codeLengths: Uint8Array, values: Uint8Array): HuffmanTable {
 		let k = 0,
 			length = 16;
-		// const code: Array<number | IHuffmanTree> = [];
-		// const code: IHuffmanTree[] = [];
 		const code: any[] = [];
 
 		while (length > 0 && !codeLengths[length - 1]) {
@@ -261,25 +247,41 @@ class JpegImage {
 		function readBit(): number /* | undefined */ {
 			// ThAW: Can this return null?
 			// Should we return undefined if the EOF is reached?
+			let result = 0;
+
 			if (bitsCount > 0) {
 				bitsCount--;
-				return (bitsData >> bitsCount) & 1;
-			}
-			bitsData = data[offset++];
-			if (bitsData == 0xff) {
-				const nextByte = data[offset++];
-				if (nextByte) {
-					throw new Error(
-						'readBit() : unexpected marker: ' +
-							((bitsData << 8) | nextByte).toString(16)
-					);
+
+				// return (bitsData >> bitsCount) & 1;
+
+				result = (bitsData >> bitsCount) & 1;
+			} else {
+				bitsData = data[offset++];
+
+				if (bitsData == 0xff) {
+					const nextByte = data[offset++];
+
+					if (nextByte) {
+						throw new Error(
+							'readBit() : unexpected marker: ' +
+								((bitsData << 8) | nextByte).toString(16)
+						);
+					}
+					// unstuff 0
 				}
-				// unstuff 0
+
+				bitsCount = 7;
+
+				// return bitsData >>> 7;
+
+				result = bitsData >>> 7;
 			}
 
-			bitsCount = 7;
+			if (result !== 0 && result !== 1) {
+				throw new Error(`readBit() : Result is neither 0 nor 1; it is ${result}.`);
+			}
 
-			return bitsData >>> 7;
+			return result;
 		}
 
 		function decodeHuffman(tree: HuffmanTable): number /* | undefined */ {
