@@ -30,7 +30,16 @@ import { BufferLike, IDecoderOptions, RawImageData, UintArrRet } from './types';
 type DataArray = Uint8Array;
 // type DataArray = Buffer;
 
-type HuffmanTree = any;
+// type HuffmanTree = any;
+// type HuffmanTreeA = number | HuffmanTreeA[];
+interface IHuffmanTree {
+	index: number;
+	// children: IHuffmanTree[];
+	// children: Array<number | IHuffmanTree>;
+	children: HuffmanTable;
+}
+type HuffmanTree = IHuffmanTree;
+type HuffmanTable = HuffmanTree[];
 
 // type Component = any;
 interface IComponent {
@@ -42,8 +51,8 @@ interface IComponent {
 	blocks: Int32Array[][];
 	blocksPerLine: number;
 	blocksPerColumn: number;
-	huffmanTableAC: HuffmanTree;
-	huffmanTableDC: HuffmanTree;
+	huffmanTableAC: HuffmanTable;
+	huffmanTableDC: HuffmanTable;
 	lines: Uint8Array[];
 	scaleX: number;
 	scaleY: number;
@@ -83,6 +92,40 @@ const defaultIFrame: IFrame = {
 	componentsOrder: []
 };
 
+interface IJFIF {
+	version: { major: number; minor: number };
+	densityUnits: number;
+	xDensity: number;
+	yDensity: number;
+	thumbWidth: number;
+	thumbHeight: number; // appData[13], appData is a Uint8Array
+	thumbData: Uint8Array;
+}
+
+const defaultJFIFValue: IJFIF = {
+	version: { major: 0, minor: 0 },
+	densityUnits: 0,
+	xDensity: 0,
+	yDensity: 0,
+	thumbWidth: 0,
+	thumbHeight: 0, // appData[13], appData is a Uint8Array
+	thumbData: new Uint8Array()
+};
+
+interface IAdobe {
+	version: number;
+	flags0: number;
+	flags1: number;
+	transformCode: number;
+}
+
+const defaultAdobeValue: IAdobe = {
+	version: 0,
+	flags0: 0,
+	flags1: 0,
+	transformCode: 0
+};
+
 const dctZigZag = new Int32Array([
 	0, 1, 8, 16, 9, 2, 3, 10, 17, 24, 32, 25, 18, 11, 4, 5, 12, 19, 26, 33, 40, 48, 41, 34, 27,
 	20, 13, 6, 7, 14, 21, 28, 35, 42, 49, 56, 57, 50, 43, 36, 29, 22, 15, 23, 30, 37, 44, 51,
@@ -117,17 +160,18 @@ class JpegImage {
 	public exifBuffer: Uint8Array | undefined;
 	// public exifBuffer: number[] | undefined;
 	public opts = defaultOpts;
-	public jfif: any;
-	public adobe: any;
+	public jfif = defaultJFIFValue;
+	public adobe = defaultAdobeValue;
 	public components: Component[] = [];
 
 	// constructor() {}
 
-	public buildHuffmanTable(codeLengths: Uint8Array, values: Uint8Array): any[] {
+	// public buildHuffmanTable(codeLengths: Uint8Array, values: Uint8Array): any[] {
+	public buildHuffmanTable(codeLengths: Uint8Array, values: Uint8Array): HuffmanTable {
 		let k = 0,
-			i,
-			j,
 			length = 16;
+		// const code: Array<number | IHuffmanTree> = [];
+		// const code: IHuffmanTree[] = [];
 		const code: any[] = [];
 
 		while (length > 0 && !codeLengths[length - 1]) {
@@ -136,12 +180,17 @@ class JpegImage {
 
 		code.push({ children: [], index: 0 });
 
-		let p = code[0],
-			q;
+		let p = code[0];
 
-		for (i = 0; i < length; i++) {
-			for (j = 0; j < codeLengths[i]; j++) {
-				p = code.pop();
+		for (let i = 0; i < length; i++) {
+			for (let j = 0; j < codeLengths[i]; j++) {
+				const pp = code.pop();
+
+				if (typeof pp === 'undefined') {
+					throw new Error('buildHuffmanTable() : code stack underflow (1)');
+				}
+
+				p = pp;
 				p.children[p.index] = values[k];
 
 				while (p.index > 0) {
@@ -149,14 +198,22 @@ class JpegImage {
 						throw new Error('Could not recreate Huffman Table');
 					}
 
-					p = code.pop();
+					const ppp = code.pop();
+
+					if (typeof ppp === 'undefined') {
+						throw new Error('buildHuffmanTable() : code stack underflow (2)');
+					}
+
+					p = ppp;
 				}
 
 				p.index++;
 				code.push(p);
 
 				while (code.length <= i) {
-					code.push((q = { children: [], index: 0 }));
+					const q = { children: [], index: 0 };
+
+					code.push(q);
 					p.children[p.index] = q.children;
 					p = q;
 				}
@@ -165,8 +222,10 @@ class JpegImage {
 			}
 
 			if (i + 1 < length) {
-				// p here points to last code
-				code.push((q = { children: [], index: 0 }));
+				// p here points to the last code
+				const q = { children: [], index: 0 };
+
+				code.push(q);
 				p.children[p.index] = q.children;
 				p = q;
 			}
@@ -223,14 +282,19 @@ class JpegImage {
 			return bitsData >>> 7;
 		}
 
-		function decodeHuffman(tree: HuffmanTree): number /* | undefined */ {
-			let node = tree,
-				bit;
+		function decodeHuffman(tree: HuffmanTable): number /* | undefined */ {
+			let node: any = tree,
+				bit: number | undefined;
 
 			while (typeof (bit = readBit()) !== 'undefined') {
 				node = node[bit];
-				if (typeof node === 'number') return node;
-				if (typeof node !== 'object') throw new Error('invalid huffman sequence');
+				// type HuffmanTree = number | HuffmanTree[];
+
+				if (typeof node === 'number') {
+					return node;
+				} else if (typeof node !== 'object') {
+					throw new Error('invalid huffman sequence');
+				}
 			}
 
 			// return undefined;
@@ -269,7 +333,7 @@ class JpegImage {
 			return n + (-1 << length) + 1;
 		}
 
-		function decodeBaseline(component: Component, zz: number[]): void {
+		function decodeBaseline(component: Component, zz: Int32Array): void {
 			const t = decodeHuffman(component.huffmanTableDC);
 			const diff = t === 0 ? 0 : receiveAndExtend(t);
 			zz[0] = component.pred += diff;
@@ -290,19 +354,19 @@ class JpegImage {
 			}
 		}
 
-		function decodeDCFirst(component: Component, zz: number[]): void {
+		function decodeDCFirst(component: Component, zz: Int32Array): void {
 			const t = decodeHuffman(component.huffmanTableDC);
 			const diff = t === 0 ? 0 : receiveAndExtend(t) << successive;
 			zz[0] = component.pred += diff;
 		}
 
-		function decodeDCSuccessive(component: Component, zz: number[]): void {
+		function decodeDCSuccessive(component: Component, zz: Int32Array): void {
 			zz[0] |= readBit() << successive;
 		}
 
 		let eobrun = 0;
 
-		function decodeACFirst(component: Component, zz: number[]): void {
+		function decodeACFirst(component: Component, zz: Int32Array): void {
 			if (eobrun > 0) {
 				eobrun--;
 				return;
@@ -331,7 +395,7 @@ class JpegImage {
 		let successiveACState = 0,
 			successiveACNextValue = 0;
 
-		function decodeACSuccessive(component: Component, zz: number[]): void {
+		function decodeACSuccessive(component: Component, zz: Int32Array): void {
 			let k = spectralStart;
 			let r = 0;
 			const e = spectralEnd;
@@ -413,7 +477,7 @@ class JpegImage {
 
 		function decodeMcu(
 			component: Component,
-			decode: (a: any, b: any) => void,
+			decode: (component: Component, zz: Int32Array) => void,
 			mcu: number,
 			row: number,
 			col: number
@@ -434,7 +498,7 @@ class JpegImage {
 
 		function decodeBlock(
 			component: Component,
-			decode: (a: any, b: any) => void,
+			decode: (component: Component, zz: Int32Array) => void,
 			mcu: number
 		): void {
 			const blockRow = (mcu / component.blocksPerLine) | 0;
@@ -446,7 +510,7 @@ class JpegImage {
 
 		const componentsLength = components.length;
 		let component, i, j, k, n;
-		let decodeFn: (component: Component, zz: number[]) => void;
+		let decodeFn: (component: Component, zz: Int32Array) => void;
 
 		if (progressive) {
 			if (spectralStart === 0) {
@@ -859,15 +923,15 @@ class JpegImage {
 			frame.mcusPerColumn = mcusPerColumn;
 		}
 
-		let jfif: any;
-		let adobe: any;
+		let jfif = defaultJFIFValue;
+		let adobe = defaultAdobeValue;
 		// let pixels = null;
 		let frame = defaultIFrame,
 			resetInterval = 0;
 		const quantizationTables = [],
 			frames = [];
-		const huffmanTablesAC: any[] = [],
-			huffmanTablesDC: any[] = [];
+		const huffmanTablesAC: HuffmanTable[] = [],
+			huffmanTablesDC: HuffmanTable[] = [];
 		let fileMarker = readUint16();
 		let malformedDataOffset = -1;
 		let appData: Uint8Array;
@@ -1071,8 +1135,8 @@ class JpegImage {
 							blocks: [],
 							blocksPerLine: 0,
 							blocksPerColumn: 0,
-							huffmanTableAC: undefined,
-							huffmanTableDC: undefined,
+							huffmanTableAC: [],
+							huffmanTableDC: [],
 							lines: [],
 							scaleX: 0,
 							scaleY: 0
@@ -1237,8 +1301,8 @@ class JpegImage {
 				blocks: [],
 				blocksPerLine: 0,
 				blocksPerColumn: 0,
-				huffmanTableAC: undefined,
-				huffmanTableDC: undefined
+				huffmanTableAC: [],
+				huffmanTableDC: []
 			});
 		}
 	}
