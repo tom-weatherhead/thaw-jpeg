@@ -53,6 +53,8 @@ interface IComponent {
 }
 type Component = IComponent;
 
+type DecodeFunction = (component: Component, zz: Int32Array) => void;
+
 interface IFrame {
 	precision: number;
 	samplesPerLine: number;
@@ -362,7 +364,6 @@ class JpegImage {
 				const z = dctZigZag[k++];
 
 				zz[z] = receiveAndExtend(s);
-				// k++;
 			}
 		}
 
@@ -501,7 +502,7 @@ class JpegImage {
 
 		function decodeMcu(
 			component: Component,
-			decode: (component: Component, zz: Int32Array) => void,
+			decode: DecodeFunction,
 			mcu: number,
 			row: number,
 			col: number
@@ -520,11 +521,7 @@ class JpegImage {
 			decode(component, component.blocks[blockRow][blockCol]);
 		}
 
-		function decodeBlock(
-			component: Component,
-			decode: (component: Component, zz: Int32Array) => void,
-			mcu: number
-		): void {
+		function decodeBlock(component: Component, decode: DecodeFunction, mcu: number): void {
 			const blockRow = (mcu / component.blocksPerLine) | 0;
 			const blockCol = mcu % component.blocksPerLine;
 
@@ -539,7 +536,7 @@ class JpegImage {
 
 		const componentsLength = components.length;
 		let component, i, j, k, n;
-		let decodeFn: (component: Component, zz: Int32Array) => void;
+		let decodeFn: DecodeFunction;
 
 		if (progressive) {
 			if (spectralStart === 0) {
