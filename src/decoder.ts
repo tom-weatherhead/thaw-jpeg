@@ -276,7 +276,7 @@ class JpegImage {
 								((bitsData << 8) | nextByte).toString(16)
 						);
 					}
-					// unstuff 0
+					// unstuff 0 // ThAW: I.e. offset--;
 				}
 
 				bitsCount = 7;
@@ -292,10 +292,7 @@ class JpegImage {
 
 		function decodeHuffman(tree: HuffmanTable): number {
 			let node: HuffmanNode = tree; //,
-			// bit: number | undefined;
 
-			// TODO: Rewrite this. readBit() never returns undefined.
-			// while (typeof (bit = readBit()) !== 'undefined') {
 			for (;;) {
 				const bit = readBit();
 				const child = node.children[bit];
@@ -314,11 +311,7 @@ class JpegImage {
 				) {
 					throw new Error('decodeHuffman() : Invalid Huffman sequence');
 				}
-
-				// node = childAsHuffmanNode;
 			}
-
-			// throw new Error('decodeHuffman() : End of bits');
 		}
 
 		function receive(length: number): number {
@@ -335,10 +328,6 @@ class JpegImage {
 		function receiveAndExtend(length: number): number {
 			const n = receive(length);
 
-			if (typeof n === 'undefined') {
-				throw new Error('receiveAndExtend() : received undefined');
-			}
-
 			if (n >= 1 << (length - 1)) {
 				return n;
 			}
@@ -349,10 +338,9 @@ class JpegImage {
 		function decodeBaseline(component: Component, zz: Int32Array): void {
 			const t = decodeHuffman(component.huffmanTableDC);
 			const diff = t === 0 ? 0 : receiveAndExtend(t);
+			let k = 1;
 
 			zz[0] = component.pred += diff;
-
-			let k = 1;
 
 			while (k < 64) {
 				const rs = decodeHuffman(component.huffmanTableAC);
@@ -371,10 +359,10 @@ class JpegImage {
 
 				k += r;
 
-				const z = dctZigZag[k];
+				const z = dctZigZag[k++];
 
 				zz[z] = receiveAndExtend(s);
-				k++;
+				// k++;
 			}
 		}
 
