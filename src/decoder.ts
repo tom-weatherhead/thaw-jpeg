@@ -291,10 +291,13 @@ class JpegImage {
 		}
 
 		function decodeHuffman(tree: HuffmanTable): number {
-			let node: HuffmanNode = tree,
-				bit: number | undefined;
+			let node: HuffmanNode = tree; //,
+			// bit: number | undefined;
 
-			while (typeof (bit = readBit()) !== 'undefined') {
+			// TODO: Rewrite this. readBit() never returns undefined.
+			// while (typeof (bit = readBit()) !== 'undefined') {
+			for (;;) {
+				const bit = readBit();
 				const child = node.children[bit];
 				// I.e. node = bit === 0 ? node.leftChild : node.rightChild;
 
@@ -302,35 +305,24 @@ class JpegImage {
 					return child;
 				}
 
-				const childAsHuffmanNode = child as HuffmanNode;
+				node = child as HuffmanNode;
 
 				if (
-					typeof childAsHuffmanNode === 'undefined' ||
-					typeof childAsHuffmanNode.children !== 'object' ||
-					typeof childAsHuffmanNode.index !== 'number'
+					typeof node === 'undefined' ||
+					typeof node.children !== 'object' ||
+					typeof node.index !== 'number'
 				) {
 					throw new Error('decodeHuffman() : Invalid Huffman sequence');
 				}
 
-				node = childAsHuffmanNode;
+				// node = childAsHuffmanNode;
 			}
 
-			throw new Error('decodeHuffman() : End of bits');
+			// throw new Error('decodeHuffman() : End of bits');
 		}
 
 		function receive(length: number): number {
 			let n = 0;
-
-			// while (length > 0) {
-			// 	const bit = readBit();
-			//
-			// 	// if (typeof bit === 'undefined') {
-			// 	// 	throw new Error('receive() : bit from readBit() is undefined');
-			// 	// }
-			//
-			// 	n = (n << 1) | bit;
-			// 	length--;
-			// }
 
 			for (; length > 0; length--) {
 				n <<= 1;
